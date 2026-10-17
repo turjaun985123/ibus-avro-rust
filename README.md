@@ -93,6 +93,10 @@ using the source code in this repository.
 
 **Recent Cinnamon versions**: See [this comment](https://github.com/sarim/ibus-avro/issues/226#issuecomment-3762641612).
 
+## Rust port
+
+The Rust core lives in [`rust/avro-phonetic`](rust/avro-phonetic/README.md). It ports the ordered transliteration patterns and context rules, dictionary matching, autocorrect, suffix candidates, ranking, and learned candidate choices. The desktop engine still runs through the existing GJS IBus integration; the next migration step is connecting the Rust core to IBus and porting its settings and lookup-table behavior. GitHub Actions owns Rust builds and validation; local Cargo commands are prohibited by the repository policy.
+
 ## Contributors
  
 __IBus Engine__ by __Sarim Khan__ <sarim2005@gmail.com>

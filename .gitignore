@@ -9,3 +9,6 @@ configure
 Makefile.in
 install-sh
 missing
+
+target/
+__pycache__/
