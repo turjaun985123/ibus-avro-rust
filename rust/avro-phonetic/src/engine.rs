@@ -219,6 +219,15 @@ impl EngineSession {
         true
     }
 
+    /// Move the highlighted candidate and remember the choice for this input.
+    pub fn move_candidate_selection(&mut self, direction: isize) -> bool {
+        if self.view.candidates.is_empty() {
+            return false;
+        }
+        self.move_selection(direction);
+        true
+    }
+
     pub fn focus_out(&mut self) -> Option<String> {
         self.commit_candidate()
     }

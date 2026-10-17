@@ -163,8 +163,19 @@ impl Engine {
     async fn property_activate(&self, _name: String, _state: u32) {}
     async fn property_show(&self, _name: String) {}
     async fn property_hide(&self, _name: String) {}
-    async fn cursor_up(&self) {}
-    async fn cursor_down(&self) {}
+    async fn cursor_up(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
+        self.move_candidate_selection(-1, &emitter).await
+    }
+
+    async fn cursor_down(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
+        self.move_candidate_selection(1, &emitter).await
+    }
     async fn page_up(&self) {}
     async fn page_down(&self) {}
 
@@ -204,6 +215,26 @@ impl Engine {
 }
 
 impl Engine {
+    async fn move_candidate_selection(
+        &self,
+        direction: isize,
+        emitter: &SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
+        let (changed, view, settings) = {
+            let mut session = self.session.lock().await;
+            let changed = session.move_candidate_selection(direction);
+            (
+                changed,
+                session.view().clone(),
+                session.settings().clone(),
+            )
+        };
+        if changed {
+            Self::emit_view(emitter, &view, &settings).await?;
+        }
+        Ok(())
+    }
+
     async fn emit_result(
         &self,
         emitter: &SignalEmitter<'_>,
