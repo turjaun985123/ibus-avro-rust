@@ -50,20 +50,26 @@ using the source code in this repository.
     and to run it you need `ibus` and `gjs`. Use the list of packages above
     as guidance, but please note that some packages may have other names.
 
-2. Now give the following commands step-by-step:
+2. Clone the project and enter its directory:
 
-		git clone https://github.com/sarim/ibus-avro.git
-		cd ibus-avro
+		git clone https://github.com/turjaun985123/ibus-avro-rust.git
+		cd ibus-avro-rust
+
+3. Download the `avro-phonetic-ibus-linux-x86_64` artifact from the latest successful [Rust core workflow](https://github.com/turjaun985123/ibus-avro-rust/actions/workflows/rust-core.yml), extract it, and place the executable at `rust/avro-phonetic/target/release/avro-phonetic-ibus` in the checkout. The package install now requires this CI-built Rust engine.
+
+4. Generate the install files, configure, and install:
+
 		aclocal && autoconf && automake --add-missing
 		./configure --prefix=/usr
 		sudo make install
 		
     __For Fedora (36, Cinnamon DE), Installing from source, and Enabling IBus Avro__
 
-		git clone https://github.com/sarim/ibus-avro.git
-		cd ibus-avro
+		git clone https://github.com/turjaun985123/ibus-avro-rust.git
+		cd ibus-avro-rust
 		sudo dnf install automake # this installs aclocal, autoconf, and automake
 		sudo dnf install ibus-devel ibus-libs  # to repair "missing ibus-1.0 error"
+		# Download and stage the CI artifact as described above before installing.
 		aclocal && autoconf && automake --add-missing
 		./configure --prefix=/usr
 
@@ -95,7 +101,7 @@ using the source code in this repository.
 
 ## Rust port
 
-The Rust migration lives in [`rust/avro-phonetic`](rust/avro-phonetic/README.md). It ports the ordered transliteration patterns and context rules, dictionary matching, autocorrect, suffix candidates, ranking, learned candidate choices, per-engine key/selection state, GSettings options, and the IBus preferences property. The existing `ibus-avro` entry remains on GJS; an experimental `ibus-avro-rust` entry is added when the Rust binary from GitHub Actions is staged at `rust/avro-phonetic/target/release/avro-phonetic-ibus` before installation. Download the `avro-phonetic-ibus-linux-x86_64` artifact from a successful [Rust core workflow](https://github.com/turjaun985123/ibus-avro-rust/actions/workflows/rust-core.yml) to stage it. GitHub Actions owns Rust builds and validation; do not run Cargo or local Rust builds.
+The Rust engine now powers the regular `ibus-avro` IBus entry. The port covers the ordered transliteration patterns and context rules, dictionary matching, autocorrect, suffix candidates, ranking, learned candidate choices, per-engine key and selection state, GSettings options, and the IBus preferences property. The existing GJS preferences window remains available from the engine's setup property. Installation requires the `avro-phonetic-ibus-linux-x86_64` binary artifact from a successful [Rust core workflow](https://github.com/turjaun985123/ibus-avro-rust/actions/workflows/rust-core.yml), staged at `rust/avro-phonetic/target/release/avro-phonetic-ibus`. GitHub Actions owns Rust builds and validation; do not run Cargo or local Rust builds. A live IBus session check remains outstanding.
 
 ## Contributors
  

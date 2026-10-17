@@ -1,13 +1,13 @@
-<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!-- filename: ibus-avro.xml -->
 <component>
 	<name>org.freedesktop.IBus.Avro</name>
 	<description>Avro Phonetic</description>
-	<exec>/usr/bin/env gjs --include-path=${pkgdatadir} ${pkgdatadir}/main-gjs.js --ibus > /dev/null</exec>
+	<exec>${libexecdir}/avro-phonetic-ibus --service-name=org.freedesktop.IBus.Avro --engine-name=ibus-avro --preferences-dir=${pkgdatadir}</exec>
 	<version>1.1</version>
 	<author>Sarim Khan &lt;sarim2005@gmail.com&gt;</author>
 	<license>MPL 2.0</license>
-	<homepage>https://github.com/sarim/ibus-avro</homepage>
+	<homepage>https://github.com/turjaun985123/ibus-avro-rust</homepage>
 	<textdomain>ibus-avro</textdomain>
 
 	<engines>
