@@ -29,7 +29,7 @@ async fn main() -> zbus::Result<()> {
     let connection = Builder::ibus()?
         .name(BUS_NAME)?
         .serve_at(FACTORY_PATH, factory)?
-        .serve_at(FACTORY_PATH, Service)
+        .serve_at(FACTORY_PATH, Service)?
         .build()
         .await?;
 
@@ -43,7 +43,7 @@ struct Factory {
     next_engine_id: Arc<AtomicUsize>,
 }
 
-#[zbus::interface(name = "org.freedesktop.IBus.Factory", spawn = "false")]
+#[zbus::interface(name = "org.freedesktop.IBus.Factory", spawn = false)]
 impl Factory {
     async fn create_engine(
         &self,
@@ -75,7 +75,7 @@ struct Engine {
     session: Mutex<EngineSession>,
 }
 
-#[zbus::interface(name = "org.freedesktop.IBus.Engine", spawn = "false")]
+#[zbus::interface(name = "org.freedesktop.IBus.Engine", spawn = false)]
 impl Engine {
     async fn process_key_event(
         &self,
@@ -135,7 +135,8 @@ impl Engine {
             )
         };
         if let Some(text) = committed {
-            Self::commit_text(&emitter, ibus_text(&text))
+            emitter
+                .commit_text(ibus_text(&text))
                 .await
                 .map_err(|error| fdo::Error::Failed(error.to_string()))?;
         }
@@ -211,7 +212,8 @@ impl Engine {
         settings: &EngineSettings,
     ) -> fdo::Result<()> {
         if let Some(text) = &result.committed {
-            Self::commit_text(emitter, ibus_text(text))
+            emitter
+                .commit_text(ibus_text(text))
                 .await
                 .map_err(|error| fdo::Error::Failed(error.to_string()))?;
         }
@@ -233,36 +235,30 @@ impl Engine {
             .map(String::as_str)
             .unwrap_or("");
 
-        Self::update_preedit_text(
-            emitter,
+        emitter
+            .update_preedit_text(
             ibus_text(preedit),
             preedit.chars().count() as u32,
             has_preedit,
             0,
-        )
-        .await
-        .map_err(|error| fdo::Error::Failed(error.to_string()))?;
-        Self::update_auxiliary_text(
-            emitter,
-            ibus_text(&view.buffer),
-            view.show_auxiliary,
-        )
-        .await
-        .map_err(|error| fdo::Error::Failed(error.to_string()))?;
-        Self::update_lookup_table(
-            emitter,
-            ibus_lookup_table(view, settings),
-            view.show_lookup_table,
-        )
-        .await
-        .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+            )
+            .await
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        emitter
+            .update_auxiliary_text(ibus_text(&view.buffer), view.show_auxiliary)
+            .await
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        emitter
+            .update_lookup_table(ibus_lookup_table(view, settings), view.show_lookup_table)
+            .await
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
         Ok(())
     }
 }
 
 struct Service;
 
-#[zbus::interface(name = "org.freedesktop.IBus.Service", spawn = "false")]
+#[zbus::interface(name = "org.freedesktop.IBus.Service", spawn = false)]
 impl Service {
     async fn destroy(
         &self,
@@ -292,37 +288,46 @@ impl Service {
 }
 
 #[derive(Clone, Serialize, Type, zbus::zvariant::Value)]
-struct IBusAttrList(String, HashMap<String, OwnedValue>, Vec<OwnedValue>);
+struct IBusAttrList {
+    type_name: String,
+    attachments: HashMap<String, OwnedValue>,
+    attributes: Vec<OwnedValue>,
+}
 
 #[derive(Clone, Serialize, Type, zbus::zvariant::Value)]
-struct IBusText(String, HashMap<String, OwnedValue>, String, OwnedValue);
+struct IBusText {
+    type_name: String,
+    attachments: HashMap<String, OwnedValue>,
+    text: String,
+    attributes: OwnedValue,
+}
 
 #[derive(Clone, Serialize, Type, zbus::zvariant::Value)]
-struct IBusLookupTable(
-    String,
-    HashMap<String, OwnedValue>,
-    u32,
-    u32,
-    bool,
-    bool,
-    i32,
-    Vec<OwnedValue>,
-    Vec<OwnedValue>,
-);
+struct IBusLookupTable {
+    type_name: String,
+    attachments: HashMap<String, OwnedValue>,
+    page_size: u32,
+    cursor_pos: u32,
+    cursor_visible: bool,
+    round: bool,
+    orientation: i32,
+    candidates: Vec<OwnedValue>,
+    labels: Vec<OwnedValue>,
+}
 
 fn ibus_text(text: &str) -> OwnedValue {
-    let attributes = OwnedValue::try_from(Value::from(IBusAttrList(
-        "IBusAttrList".into(),
-        HashMap::new(),
-        Vec::new(),
-    )))
+    let attributes = OwnedValue::try_from(Value::from(IBusAttrList {
+        type_name: "IBusAttrList".into(),
+        attachments: HashMap::new(),
+        attributes: Vec::new(),
+    }))
     .expect("IBus attribute list is a valid D-Bus value");
-    OwnedValue::try_from(Value::from(IBusText(
-        "IBusText".into(),
-        HashMap::new(),
-        text.to_owned(),
+    OwnedValue::try_from(Value::from(IBusText {
+        type_name: "IBusText".into(),
+        attachments: HashMap::new(),
+        text: text.to_owned(),
         attributes,
-    )))
+    }))
     .expect("IBus text is a valid D-Bus value")
 }
 
@@ -331,19 +336,19 @@ fn ibus_lookup_table(view: &EngineView, settings: &EngineSettings) -> OwnedValue
     // IBus displays numbered labels by default; blank labels preserve the
     // legacy Avro lookup-table presentation.
     let labels = view.candidates.iter().map(|_| ibus_text("")).collect();
-    let table = IBusLookupTable(
-        "IBusLookupTable".into(),
-        HashMap::new(),
-        settings.lookup_table_size as u32,
-        view.selection as u32,
-        true,
-        true,
-        match settings.lookup_orientation {
+    let table = IBusLookupTable {
+        type_name: "IBusLookupTable".into(),
+        attachments: HashMap::new(),
+        page_size: settings.lookup_table_size as u32,
+        cursor_pos: view.selection as u32,
+        cursor_visible: true,
+        round: true,
+        orientation: match settings.lookup_orientation {
             LookupOrientation::Horizontal => 0,
             LookupOrientation::Vertical => 1,
         },
         candidates,
         labels,
-    );
+    };
     OwnedValue::try_from(Value::from(table)).expect("IBus lookup table is a valid D-Bus value")
 }
