@@ -9,6 +9,7 @@ use std::{
 use avro_phonetic::{
     EngineSession, EngineSettings, EngineView, KeyEvent, KeyResult, LookupOrientation,
 };
+use gio::prelude::*;
 use serde::Serialize;
 use tokio::sync::Mutex;
 use zbus::{
@@ -86,6 +87,16 @@ impl Factory {
 #[derive(Default)]
 struct Engine {
     session: Mutex<EngineSession>,
+}
+
+impl Default for Engine {
+    fn default() -> Self {
+        let mut session = EngineSession::new();
+        session.set_settings(read_engine_settings());
+        Self {
+            session: Mutex::new(session),
+        }
+    }
 }
 
 #[zbus::interface(name = "org.freedesktop.IBus.Engine", spawn = false)]
@@ -168,7 +179,12 @@ impl Engine {
         Self::emit_view(&emitter, &view, &settings).await
     }
 
-    async fn focus_in(&self) {}
+    async fn focus_in(&self) {
+        self.session
+            .lock()
+            .await
+            .set_settings(read_engine_settings());
+    }
     async fn enable(&self) {}
     async fn disable(&self) {}
     async fn set_cursor_location(&self, _x: i32, _y: i32, _width: i32, _height: i32) {}
@@ -395,4 +411,29 @@ fn ibus_lookup_table(view: &EngineView, settings: &EngineSettings) -> OwnedValue
         labels,
     };
     OwnedValue::try_from(Value::from(table)).expect("IBus lookup table is a valid D-Bus value")
+}
+
+fn read_engine_settings() -> EngineSettings {
+    let Some(schema_source) = gio::SettingsSchemaSource::default() else {
+        return EngineSettings::default();
+    };
+    if schema_source
+        .lookup("com.omicronlab.avro", true)
+        .is_none()
+    {
+        return EngineSettings::default();
+    }
+
+    let settings = gio::Settings::new("com.omicronlab.avro");
+    EngineSettings {
+        preview_enabled: settings.boolean("switch-preview"),
+        dictionary_enabled: settings.boolean("switch-dict"),
+        newline_on_enter: settings.boolean("switch-newline"),
+        lookup_table_size: settings.int("lutable-size").clamp(1, 15) as usize,
+        lookup_orientation: if settings.int("cboxorient") == 1 {
+            LookupOrientation::Vertical
+        } else {
+            LookupOrientation::Horizontal
+        },
+    }
 }

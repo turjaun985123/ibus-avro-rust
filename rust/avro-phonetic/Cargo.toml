@@ -18,6 +18,7 @@ name = "avro-phonetic-ibus"
 path = "src/ibus.rs"
 
 [dependencies]
+gio = "0.21"
 regex = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

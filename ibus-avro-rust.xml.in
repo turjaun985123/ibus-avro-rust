@@ -3,6 +3,7 @@
 	<name>org.freedesktop.IBus.AvroRust</name>
 	<description>Avro Phonetic (Rust)</description>
 	<exec>${libexecdir}/avro-phonetic-ibus --service-name=org.freedesktop.IBus.AvroRust --engine-name=ibus-avro-rust</exec>
+	<setup>/usr/bin/env gjs --include-path=${pkgdatadir} ${pkgdatadir}/pref.js --standalone</setup>
 	<version>0.1</version>
 	<author>Sarim Khan &lt;sarim2005@gmail.com&gt;</author>
 	<license>MPL 2.0</license>
