@@ -7,10 +7,12 @@
 //! Avro phonetic transliteration and suggestion engine.
 
 mod dictionary;
+mod engine;
 mod patterns;
 mod regex_patterns;
 mod suggestions;
 
+pub use engine::{EngineSession, EngineSettings, EngineView, KeyEvent, KeyResult, LookupOrientation};
 pub use suggestions::{CandidateList, Preferences, SuggestionEngine};
 
 use patterns::{Condition, Pattern, Position, Scope, CASE_SENSITIVE, CONSONANTS, PATTERNS, VOWELS};
