@@ -121,6 +121,7 @@ impl Engine {
         let state = state & 0x5f00_1fff;
         let (result, view, settings) = {
             let mut session = self.session.lock().await;
+            sync_engine_settings(&mut session);
             let result = session.process_key_event(KeyEvent {
                 keyval,
                 keycode,
@@ -289,6 +290,7 @@ impl Engine {
     ) -> fdo::Result<()> {
         let (changed, view, settings) = {
             let mut session = self.session.lock().await;
+            sync_engine_settings(&mut session);
             let changed = session.move_candidate_selection(direction);
             (
                 changed,
@@ -526,5 +528,12 @@ fn read_engine_settings() -> EngineSettings {
         } else {
             LookupOrientation::Horizontal
         },
+    }
+}
+
+fn sync_engine_settings(session: &mut EngineSession) {
+    let settings = read_engine_settings();
+    if session.settings() != &settings {
+        session.set_settings(settings);
     }
 }
