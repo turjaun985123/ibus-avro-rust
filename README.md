@@ -95,7 +95,7 @@ using the source code in this repository.
 
 ## Rust port
 
-The Rust core lives in [`rust/avro-phonetic`](rust/avro-phonetic/README.md). It ports the ordered transliteration patterns and context rules, dictionary matching, autocorrect, suffix candidates, ranking, learned candidate choices, and per-engine key/selection state. The desktop engine still runs through the existing GJS IBus integration; the next migration step is connecting the Rust core to IBus D-Bus and porting its desktop settings. GitHub Actions owns Rust builds and validation; local Cargo commands are prohibited by the repository policy.
+The Rust migration lives in [`rust/avro-phonetic`](rust/avro-phonetic/README.md). It ports the ordered transliteration patterns and context rules, dictionary matching, autocorrect, suffix candidates, ranking, learned candidate choices, and per-engine key/selection state. A Rust IBus D-Bus service binary now connects that core to IBus, but the installed component still launches the legacy GJS process while packaging, desktop settings, and property UI are migrated. GitHub Actions owns Rust builds and validation; do not run Cargo or local Rust builds.
 
 ## Contributors
  
