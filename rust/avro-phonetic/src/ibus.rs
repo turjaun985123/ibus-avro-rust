@@ -84,7 +84,6 @@ impl Factory {
     }
 }
 
-#[derive(Default)]
 struct Engine {
     session: Mutex<EngineSession>,
 }
