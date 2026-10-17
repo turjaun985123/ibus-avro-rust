@@ -95,7 +95,7 @@ using the source code in this repository.
 
 ## Rust port
 
-The Rust migration lives in [`rust/avro-phonetic`](rust/avro-phonetic/README.md). It ports the ordered transliteration patterns and context rules, dictionary matching, autocorrect, suffix candidates, ranking, learned candidate choices, and per-engine key/selection state. A Rust IBus D-Bus service binary now connects that core to IBus, but the installed component still launches the legacy GJS process while packaging, desktop settings, and property UI are migrated. GitHub Actions owns Rust builds and validation; do not run Cargo or local Rust builds.
+The Rust migration lives in [`rust/avro-phonetic`](rust/avro-phonetic/README.md). It ports the ordered transliteration patterns and context rules, dictionary matching, autocorrect, suffix candidates, ranking, learned candidate choices, and per-engine key/selection state. The existing `ibus-avro` entry remains on GJS; an experimental `ibus-avro-rust` entry is added when the Rust binary from GitHub Actions is staged at `rust/avro-phonetic/target/release/avro-phonetic-ibus` before installation. Download the `avro-phonetic-ibus-linux-x86_64` artifact from a successful [Rust core workflow](https://github.com/turjaun985123/ibus-avro-rust/actions/workflows/rust-core.yml) to stage it. GitHub Actions owns Rust builds and validation; do not run Cargo or local Rust builds.
 
 ## Contributors
  

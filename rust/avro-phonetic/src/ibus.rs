@@ -20,14 +20,26 @@ use zbus::{
 
 const BUS_NAME: &str = "org.freedesktop.IBus.Avro";
 const FACTORY_PATH: &str = "/org/freedesktop/IBus/Factory";
+const DEFAULT_ENGINE_NAME: &str = "ibus-avro";
 
 #[tokio::main]
 async fn main() -> zbus::Result<()> {
+    let mut service_name = BUS_NAME.to_owned();
+    let mut engine_name = DEFAULT_ENGINE_NAME.to_owned();
+    for argument in std::env::args().skip(1) {
+        if let Some(value) = argument.strip_prefix("--service-name=") {
+            service_name = value.to_owned();
+        } else if let Some(value) = argument.strip_prefix("--engine-name=") {
+            engine_name = value.to_owned();
+        }
+    }
+
     let factory = Factory {
+        engine_name,
         next_engine_id: Arc::new(AtomicUsize::new(0)),
     };
     let connection = Builder::ibus()?
-        .name(BUS_NAME)?
+        .name(service_name)?
         .serve_at(FACTORY_PATH, factory)?
         .serve_at(FACTORY_PATH, Service)?
         .build()
@@ -40,6 +52,7 @@ async fn main() -> zbus::Result<()> {
 }
 
 struct Factory {
+    engine_name: String,
     next_engine_id: Arc<AtomicUsize>,
 }
 
@@ -50,7 +63,7 @@ impl Factory {
         engine_name: String,
         #[zbus(object_server)] server: &ObjectServer,
     ) -> fdo::Result<OwnedObjectPath> {
-        if engine_name != "ibus-avro" {
+        if engine_name != self.engine_name {
             return Err(fdo::Error::Failed(format!("Unknown engine: {engine_name}")));
         }
 
