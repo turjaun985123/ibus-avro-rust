@@ -1,5 +1,7 @@
 use std::{
     collections::HashMap,
+    path::PathBuf,
+    process::Command,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -27,16 +29,20 @@ const DEFAULT_ENGINE_NAME: &str = "ibus-avro";
 async fn main() -> zbus::Result<()> {
     let mut service_name = BUS_NAME.to_owned();
     let mut engine_name = DEFAULT_ENGINE_NAME.to_owned();
+    let mut preferences_dir = None;
     for argument in std::env::args().skip(1) {
         if let Some(value) = argument.strip_prefix("--service-name=") {
             service_name = value.to_owned();
         } else if let Some(value) = argument.strip_prefix("--engine-name=") {
             engine_name = value.to_owned();
+        } else if let Some(value) = argument.strip_prefix("--preferences-dir=") {
+            preferences_dir = Some(PathBuf::from(value));
         }
     }
 
     let factory = Factory {
         engine_name,
+        preferences_dir,
         next_engine_id: Arc::new(AtomicUsize::new(0)),
     };
     let connection = Builder::ibus()?
@@ -54,6 +60,7 @@ async fn main() -> zbus::Result<()> {
 
 struct Factory {
     engine_name: String,
+    preferences_dir: Option<PathBuf>,
     next_engine_id: Arc<AtomicUsize>,
 }
 
@@ -71,7 +78,7 @@ impl Factory {
         let id = self.next_engine_id.fetch_add(1, Ordering::Relaxed) + 1;
         let path = format!("/org/freedesktop/IBus/Engine/{id}");
         server
-            .at(path.as_str(), Engine::default())
+            .at(path.as_str(), Engine::new(self.preferences_dir.clone()))
             .await
             .map_err(|error| fdo::Error::Failed(error.to_string()))?;
         server
@@ -86,14 +93,16 @@ impl Factory {
 
 struct Engine {
     session: Mutex<EngineSession>,
+    preferences_dir: Option<PathBuf>,
 }
 
-impl Default for Engine {
-    fn default() -> Self {
+impl Engine {
+    fn new(preferences_dir: Option<PathBuf>) -> Self {
         let mut session = EngineSession::new();
         session.set_settings(read_engine_settings());
         Self {
             session: Mutex::new(session),
+            preferences_dir,
         }
     }
 }
@@ -178,17 +187,41 @@ impl Engine {
         Self::emit_view(&emitter, &view, &settings).await
     }
 
-    async fn focus_in(&self) {
+    async fn focus_in(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
         self.session
             .lock()
             .await
             .set_settings(read_engine_settings());
+        emitter
+            .register_properties(ibus_properties())
+            .await
+            .map_err(|error| fdo::Error::Failed(error.to_string()))
     }
     async fn enable(&self) {}
     async fn disable(&self) {}
     async fn set_cursor_location(&self, _x: i32, _y: i32, _width: i32, _height: i32) {}
     async fn set_capabilities(&self, _capabilities: u32) {}
-    async fn property_activate(&self, _name: String, _state: u32) {}
+    async fn property_activate(&self, name: String, _state: u32) -> fdo::Result<()> {
+        if name != "setup" {
+            return Ok(());
+        }
+        let Some(preferences_dir) = &self.preferences_dir else {
+            return Err(fdo::Error::Failed(
+                "Avro preferences directory was not configured".into(),
+            ));
+        };
+
+        Command::new("gjs")
+            .arg(format!("--include-path={}", preferences_dir.display()))
+            .arg(preferences_dir.join("pref.js"))
+            .arg("--standalone")
+            .spawn()
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        Ok(())
+    }
     async fn property_show(&self, _name: String) {}
     async fn property_hide(&self, _name: String) {}
     async fn cursor_up(
@@ -239,6 +272,12 @@ impl Engine {
         emitter: &SignalEmitter<'_>,
         table: OwnedValue,
         visible: bool,
+    ) -> zbus::Result<()>;
+
+    #[zbus(signal)]
+    async fn register_properties(
+        emitter: &SignalEmitter<'_>,
+        properties: OwnedValue,
     ) -> zbus::Result<()>;
 }
 
@@ -374,6 +413,29 @@ struct IBusLookupTable {
     labels: Vec<OwnedValue>,
 }
 
+#[derive(Clone, Serialize, Type, zbus::zvariant::Value)]
+struct IBusPropertyList {
+    type_name: String,
+    attachments: HashMap<String, OwnedValue>,
+    properties: Vec<OwnedValue>,
+}
+
+#[derive(Clone, Serialize, Type, zbus::zvariant::Value)]
+struct IBusProperty {
+    type_name: String,
+    attachments: HashMap<String, OwnedValue>,
+    key: String,
+    prop_type: u32,
+    label: OwnedValue,
+    icon: String,
+    tooltip: OwnedValue,
+    sensitive: bool,
+    visible: bool,
+    state: u32,
+    sub_properties: OwnedValue,
+    symbol: OwnedValue,
+}
+
 fn ibus_text(text: &str) -> OwnedValue {
     let attributes = OwnedValue::try_from(Value::from(IBusAttrList {
         type_name: "IBusAttrList".into(),
@@ -410,6 +472,36 @@ fn ibus_lookup_table(view: &EngineView, settings: &EngineSettings) -> OwnedValue
         labels,
     };
     OwnedValue::try_from(Value::from(table)).expect("IBus lookup table is a valid D-Bus value")
+}
+
+fn ibus_properties() -> OwnedValue {
+    let empty_sub_properties = OwnedValue::try_from(Value::from(IBusPropertyList {
+        type_name: "IBusPropList".into(),
+        attachments: HashMap::new(),
+        properties: Vec::new(),
+    }))
+    .expect("empty IBus property list is a valid D-Bus value");
+    let setup = OwnedValue::try_from(Value::from(IBusProperty {
+        type_name: "IBusProperty".into(),
+        attachments: HashMap::new(),
+        key: "setup".into(),
+        prop_type: 0,
+        label: ibus_text("Preferences - Avro"),
+        icon: "gtk-preferences".into(),
+        tooltip: ibus_text("Configure Avro"),
+        sensitive: true,
+        visible: true,
+        state: 0,
+        sub_properties: empty_sub_properties,
+        symbol: ibus_text(""),
+    }))
+    .expect("Avro setup property is a valid D-Bus value");
+    OwnedValue::try_from(Value::from(IBusPropertyList {
+        type_name: "IBusPropList".into(),
+        attachments: HashMap::new(),
+        properties: vec![setup],
+    }))
+    .expect("Avro property list is a valid D-Bus value")
 }
 
 fn read_engine_settings() -> EngineSettings {
